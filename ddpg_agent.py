@@ -19,6 +19,8 @@ WEIGHT_DECAY = 0        # L2 weight decay
 
 LEARN_EVERY_X_TIMESTEPS = 20
 UPDATES_PER_LEARN_STEP = 10
+EPSILON = 1.0
+EPSILON_DECAY = 1e-6
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -37,6 +39,7 @@ class Agent():
         self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(random_seed)
+        self.epsilon = EPSILON
 
         # Actor Network (w/ Target Network)
         self.actor_local = Actor(state_size, action_size, random_seed).to(device)
@@ -73,7 +76,7 @@ class Agent():
             action = self.actor_local(state).cpu().data.numpy()
         self.actor_local.train()
         if add_noise:
-            action += self.noise.sample()
+            action += self.epsilon * self.noise.sample()
         return np.clip(action, -1, 1)
 
     def reset(self):
@@ -119,8 +122,12 @@ class Agent():
 
         # ----------------------- update target networks ----------------------- #
         self.soft_update(self.critic_local, self.critic_target, TAU)
-        self.soft_update(self.actor_local, self.actor_target, TAU)                     
-
+        self.soft_update(self.actor_local, self.actor_target, TAU)           
+        
+        # ---------------------------- update noise ---------------------------- #
+        self.epsilon -= EPSILON_DECAY
+        self.noise.reset()
+        
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
         θ_target = τ*θ_local + (1 - τ)*θ_target
